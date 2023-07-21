@@ -1,0 +1,21 @@
+[[source]]
+url = "https://pypi.org/simple"
+verify_ssl = true
+name = "pypi"
+
+[packages]
+requests = "*"
+onesecmail = "*"
+pymongo = "*"
+faker = "*"
+reverse-geocoder = "*"
+selenium = "*"
+undetected-chromedriver = "*"
+bs4 = "*"
+lxml = "*"
+deathbycaptcha = "*"
+
+[dev-packages]
+
+[requires]
+python_version = "3.8"
