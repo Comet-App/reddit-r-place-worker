@@ -14,6 +14,8 @@ undetected-chromedriver = "*"
 bs4 = "*"
 lxml = "*"
 deathbycaptcha = "*"
+peewee = "*"
+psycopg2-binary = "*"
 
 [dev-packages]
 
