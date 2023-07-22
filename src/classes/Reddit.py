@@ -58,7 +58,10 @@ class Reddit:
             self.do_login()
 
     def close_me(self):
-        self.driver.close()
+        try:
+            self.driver.close()
+        except:
+            pass
 
     def __del__(self):
         self.close_me()
