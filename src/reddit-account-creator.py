@@ -1,11 +1,19 @@
 import pickle
+import time
 from classes import FakeMailBox, FakePerson, Reddit
+from datetime import datetime
 from models import User, AccessToken
-from utils import get_logger
+from utils import get_logger, launch_tor, TOR_PROXY
 import os
 
 logger = get_logger(__name__)
-USERS_COUNT = 1  # 100000
+USERS_COUNT = 2  # 100000
+DBC_USERNAME = os.environ.get("DBC_USERNAME")
+DBC_PASSWORD = os.environ.get("DBC_PASSWORD")
+
+logger.info("Launching tor setup")
+
+tor_process = None
 
 created_user_count = 0
 while created_user_count < USERS_COUNT:
@@ -15,8 +23,17 @@ while created_user_count < USERS_COUNT:
     # Attach mailbox to user
     person.mailbox = mailbox
 
+    if tor_process:
+        tor_process.kill()
+    tor_process = launch_tor()
+
     reddit_bot = Reddit(
-        person, dbc_username=DBC_USERNAME, dbc_password=DBC_PASSWORD, headless=True
+        person,
+        dbc_username=DBC_USERNAME,
+        dbc_password=DBC_PASSWORD,
+        headless=True,
+        proxies=TOR_PROXY,
+        logger=logger,
     )
     res = reddit_bot.create_account()
 
@@ -26,9 +43,11 @@ while created_user_count < USERS_COUNT:
             username=person.username,
             password=person.password,
             create_account=datetime.now(),
+            disabled=None,
         )
         user.save()
         try:
+            logger.info(f"Generating token for user {person.username}")
             # Generate token
             token = reddit_bot.get_access_token()
 
@@ -46,5 +65,3 @@ while created_user_count < USERS_COUNT:
         created_user_count += 1
 
     reddit_bot.close_me()
-
-    time.sleep(600)

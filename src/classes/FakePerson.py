@@ -36,7 +36,7 @@ class FakePerson:
         location_dict = FakePerson.city_state_country(
             profile["current_location"][0], profile["current_location"][1]
         )
-
+        self.has_reddit = False
         self.password_length = randint(8, 16)
         self.generate_password()
         self.city = location_dict["city"]

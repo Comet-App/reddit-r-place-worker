@@ -18,7 +18,7 @@ from utils import get_logger
 MAX_INTERESTS_TO_SELECT = 7
 BROWSER_WINDOW_WIDTH = 1360
 BROWSER_WINDOW_HEIGHT = 768
-MAX_WAIT_FOR_ELEMENTS_IN_SECS = 20
+MAX_WAIT_FOR_ELEMENTS_IN_SECS = 40
 GOOGLE_RECAPTCHA_URL_PATTERN = "google.com/recaptcha/api"
 HCAPTCHA_URL_PATTERN = "hcaptcha.com/captcha/v1"
 REDDIT_RECAPTCHA_SITE_KEY = "6LeTnxkTAAAAAN9QEuDZRpn90WwKk_R1TRW_g-JC"
@@ -35,12 +35,18 @@ class Reddit:
         dbc_username=None,
         dbc_password=None,
         logger=None,
+        proxies=None,
     ):
         self.person = person
         self.logger = logger or get_logger(__name__)
 
+        # Setup proxy
+        opts = uc.ChromeOptions()
+        if proxies is not None:
+            opts.add_argument(f"--proxy-server={proxies}")
+
         # Init selenium driver
-        self.driver = uc.Chrome(headless=headless, use_subprocess=False)
+        self.driver = uc.Chrome(headless=headless, use_subprocess=False, options=opts)
         self.driver.set_window_size(BROWSER_WINDOW_WIDTH, BROWSER_WINDOW_HEIGHT)
 
         self.has_logged_in = False
@@ -168,6 +174,11 @@ class Reddit:
         return False
 
     def select_gender_for_user(self):
+        # Wait for gender input
+        WebDriverWait(self.driver, MAX_WAIT_FOR_ELEMENTS_IN_SECS).until(
+            EC.presence_of_element_located((By.CSS_SELECTOR, "input[value=FEMALE]"))
+        )
+
         person_sex = self.person.sex
         if person_sex == "F":
             gender_element = self.driver.find_element(
@@ -196,10 +207,21 @@ class Reddit:
         return None
 
     def select_random_interests_for_user(self, max_interests=MAX_INTERESTS_TO_SELECT):
+        # Wait for gender input
+        WebDriverWait(self.driver, MAX_WAIT_FOR_ELEMENTS_IN_SECS).until(
+            EC.presence_of_element_located(
+                (
+                    By.XPATH,
+                    '//*[@id="SHORTCUT_FOCUSABLE_DIV"]/div[4]/div/div/div/div[1]/div/button',
+                )
+            )
+        )
+
         interests_buttons_elements = self.driver.find_elements(
             By.XPATH,
             '//*[@id="SHORTCUT_FOCUSABLE_DIV"]/div[4]/div/div/div/div[1]/div/button',
         )
+
         assert (
             len(interests_buttons_elements) > max_interests
         ), "Interests buttons are less than max_interests"
@@ -218,7 +240,6 @@ class Reddit:
             self.sleep_randomly(1, 2)
 
         self.find_and_click_continue_button()
-
         self.person.interests = selected_interests
 
     def select_all_given_subreddits(self):
@@ -259,7 +280,11 @@ class Reddit:
         self.logger.info(f"Creating account with username: {self.person.username}")
         self.logger.debug("Going to reddit homepage")
         self.driver.get(self.REGISTER_URL)
-        self.sleep_randomly()
+
+        # Wait for email input
+        WebDriverWait(self.driver, MAX_WAIT_FOR_ELEMENTS_IN_SECS).until(
+            EC.presence_of_element_located((By.ID, "regEmail"))
+        )
 
         self.logger.debug("Entering email details")
         self.driver.find_element(By.ID, "regEmail").send_keys(self.person.email)
@@ -274,6 +299,11 @@ class Reddit:
         self.sleep_randomly()
 
         while True:
+            # Wait for username input
+            WebDriverWait(self.driver, MAX_WAIT_FOR_ELEMENTS_IN_SECS).until(
+                EC.presence_of_element_located((By.ID, "regUsername"))
+            )
+
             self.logger.debug("Entering in username...")
             self.driver.find_element(By.ID, "regUsername").click()
             self.driver.find_element(By.ID, "regUsername").clear()
@@ -291,7 +321,7 @@ class Reddit:
 
         self.logger.debug("Entering in password...")
         self.driver.find_element(By.ID, "regPassword").send_keys(self.person.password)
-        self.sleep_randomly(5, 10)
+        self.sleep_randomly(15, 40)
 
         # Solve captcha
         if self.is_google_recaptcha():
