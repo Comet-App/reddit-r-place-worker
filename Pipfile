@@ -16,6 +16,7 @@ lxml = "*"
 deathbycaptcha = "*"
 peewee = "*"
 psycopg2-binary = "*"
+stem = "*"
 
 [dev-packages]
 
