@@ -7,6 +7,10 @@ from selenium.webdriver.common.by import By
 from deathbycaptcha import deathbycaptcha
 from random import randint, sample
 from bs4 import BeautifulSoup
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+from selenium.common.exceptions import TimeoutException
+
 
 import time
 from utils import get_logger
@@ -14,6 +18,7 @@ from utils import get_logger
 MAX_INTERESTS_TO_SELECT = 7
 BROWSER_WINDOW_WIDTH = 1360
 BROWSER_WINDOW_HEIGHT = 768
+MAX_WAIT_FOR_ELEMENTS_IN_SECS = 20
 GOOGLE_RECAPTCHA_URL_PATTERN = "google.com/recaptcha/api"
 HCAPTCHA_URL_PATTERN = "hcaptcha.com/captcha/v1"
 REDDIT_RECAPTCHA_SITE_KEY = "6LeTnxkTAAAAAN9QEuDZRpn90WwKk_R1TRW_g-JC"
@@ -21,6 +26,7 @@ REDDIT_RECAPTCHA_SITE_KEY = "6LeTnxkTAAAAAN9QEuDZRpn90WwKk_R1TRW_g-JC"
 
 class Reddit:
     REGISTER_URL = "https://www.reddit.com/register/"
+    LOGIN_URL = "https://www.reddit.com/login/"
 
     def __init__(
         self,
@@ -37,13 +43,25 @@ class Reddit:
         self.driver = uc.Chrome(headless=headless, use_subprocess=False)
         self.driver.set_window_size(BROWSER_WINDOW_WIDTH, BROWSER_WINDOW_HEIGHT)
 
-        # Death by captcha setup
-        if dbc_username is None or dbc_password is None:
-            self.logger.critical("Death by captcha username and password not provided")
-            raise Exception("Death by captcha username or password not provided")
+        self.has_logged_in = False
+        if not self.person.has_reddit:
+            # Death by captcha setup
+            if dbc_username is None or dbc_password is None:
+                self.logger.critical(
+                    "Death by captcha username and password not provided"
+                )
+                raise Exception("Death by captcha username or password not provided")
 
-        self.dbc_client = deathbycaptcha.HttpClient(dbc_username, dbc_password)
-        self.check_deathbycaptcha_balance()
+            self.dbc_client = deathbycaptcha.HttpClient(dbc_username, dbc_password)
+            self.check_deathbycaptcha_balance()
+        else:
+            self.do_login()
+
+    def close_me(self):
+        self.driver.close()
+
+    def __del__(self):
+        self.close_me()
 
     def check_deathbycaptcha_balance(self):
         try:
@@ -296,7 +314,6 @@ class Reddit:
 
         if self.check_for_submit_rate_limit():
             self.logger.critical("Rate limit reached for the current IP")
-            self.driver.close()
             # It expires session so need to do the whole thing again
             return False
 
@@ -322,5 +339,52 @@ class Reddit:
         self.sleep_randomly()
 
         self.logger.info("Successfully created account!")
-        self.driver.close()
+        self.has_logged_in = True
         return True
+
+    def do_login(self, username=None, password=None):
+        self.driver.get(self.LOGIN_URL)
+        if username is None:
+            username = self.person.username
+        if password is None:
+            password = self.person.password
+
+        WebDriverWait(self.driver, MAX_WAIT_FOR_ELEMENTS_IN_SECS).until(
+            EC.presence_of_element_located((By.ID, "loginUsername"))
+        )
+
+        username_input = self.driver.find_element(By.ID, "loginUsername")
+        username_input.send_keys(username)
+        password_input = self.driver.find_element(By.ID, "loginPassword")
+        password_input.send_keys(password)
+        self.driver.find_element(By.CSS_SELECTOR, 'button[type="submit"]').click()
+
+        # Wait for user screen
+        try:
+            WebDriverWait(self.driver, MAX_WAIT_FOR_ELEMENTS_IN_SECS).until(
+                EC.presence_of_element_located((By.ID, "USER_DROPDOWN_ID"))
+            )
+        except TimeoutException:
+            self.logger.critical(f"Login failed for user: {username}")
+            return False
+        self.has_logged_in = True
+        self.logger.debug("Login successful")
+        return True
+
+    def get_access_token(self) -> str:
+        if not self.has_logged_in:
+            self.do_login()
+
+        # Return access token
+        js_code = """
+            const getAccessToken = async () => {
+                const usingOldReddit = window.location.href.includes('new.reddit.com');
+                const url = 'https://www.reddit.com/r/place/';
+                const response = await fetch(url);
+                const responseText = await response.text();
+                return responseText.match(/"accessToken":"(\\"|[^"]*)"/)[1];
+            };
+            return getAccessToken();
+        """
+        access_token = self.driver.execute_script(js_code)
+        return access_token
