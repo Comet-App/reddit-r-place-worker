@@ -30,7 +30,7 @@ while True:
         fake_person.password = user.password
         fake_person.has_reddit = True
         try:
-            reddit_account = Reddit(fake_person, headless=False)
+            reddit_account = Reddit(fake_person, headless=True)
             token = reddit_account.get_access_token()
             reddit_account.close_me()
             user.last_used = datetime.now()
