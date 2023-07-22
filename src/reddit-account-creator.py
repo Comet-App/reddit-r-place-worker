@@ -1,4 +1,6 @@
+import datetime
 import pickle
+import time
 from classes import FakeMailBox, FakePerson, Reddit
 from models import User, AccessToken
 from utils import get_logger
@@ -6,6 +8,8 @@ import os
 
 logger = get_logger(__name__)
 USERS_COUNT = 1  # 100000
+DBC_USERNAME = os.getenv("DBC_USERNAME")
+DBC_PASSWORD = os.getenv("DBC_PASSWORD")
 
 created_user_count = 0
 while created_user_count < USERS_COUNT:
