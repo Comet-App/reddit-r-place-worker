@@ -17,7 +17,7 @@ while created_user_count < USERS_COUNT:
     person.mailbox = mailbox
 
     reddit_bot = Reddit(
-        person, dbc_username=DBC_USERNAME, dbc_password=DBC_PASSWORD, headless=False
+        person, dbc_username=DBC_USERNAME, dbc_password=DBC_PASSWORD, headless=True
     )
     res = reddit_bot.create_account()
 
