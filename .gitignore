@@ -51,6 +51,7 @@ venv
 docs.zip
 archive.zip
 back
+user-data
 *.log
 *.pickle
 # vim temporary files
